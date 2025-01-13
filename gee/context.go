@@ -2,8 +2,11 @@ package gee
 
 import(
 	"net/http"
-	"json"
+	"fmt"
+	"encoding/json"
 )
+
+type H map[string]interface{}
 
 type Context struct{
 	//	origin objects
@@ -21,7 +24,7 @@ func newContext(w http.ResponseWriter, req *http.Request) *Context{
 		Writer: w,
 		Req: req,
 		Path: req.URL.Path,
-		Method: req.Method
+		Method: req.Method,
 	}
 }
 
@@ -32,12 +35,12 @@ func (c *Context) Query(key string) string{
 
 // 获取消息体中的指定键的键值-POST请求
 func (c *Context) PostForm(key string) string{
-	return c.Req.FromValue(key)
+	return c.Req.FormValue(key)
 }
 
 func (c *Context) Status(code int){
 	c.StatusCode = code
-	c.Writer.WriterHeader(code)
+	c.Writer.WriteHeader(code)
 }
 
 func (c *Context) SetHeader(key string, value string){
@@ -53,7 +56,10 @@ func (c *Context) String(code int, format string, values ...interface{}){
 func (c *Context) JSON(code int, json string){
 	c.Status(code)
 	c.SetHeader("Content-Type", "application/json")
-	c.Writer.Write([]byte(json))
+	encoder := json.NewEncoder(c.Writer)
+	if err := encoder.Encode(obj); err != nil {
+		http.Error(c.Writer, err.Error(), 500)
+	}
 }
 
 func (c *Context) HTML(code int, html string){
