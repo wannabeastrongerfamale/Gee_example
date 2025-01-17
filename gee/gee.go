@@ -2,20 +2,21 @@ package gee
 
 import(
 	"net/http"
+	"strings"
 )
 
 type HandlerFunc func(c *Context)
 
 type Engine struct{
-	*RouterGroup	//嵌入RouterGroup---可以直接使用RouterGroup的成员方法
+	*RouterGroup	//根RouterGroup
 	router 	*Router	//路由
 	groups []*RouterGroup	//分组列表
 }
 
 type RouterGroup struct{
 	prefix string
-	parent *RouterGroup
 	engine *Engine
+	middlewares []HandlerFunc
 }
 
 //New构造gee.Engine
@@ -32,7 +33,6 @@ func (group *RouterGroup) Group(prefix string) *RouterGroup{
 	engine := group.engine
 	newGroup := &RouterGroup{
 		prefix: group.prefix + prefix,
-		parent: group,
 		engine: engine,
 	}
 	engine.groups = append(engine.groups, newGroup)
@@ -57,7 +57,21 @@ func (engine *Engine) Run(addr string) (err error) {
 	return http.ListenAndServe(addr,engine)
 }
 
+// 处理HTTP请求入口
 func (engine *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request){
+	//在接收到一个具体请求时，判断请求适用于哪些中间件
+	var middlewares []HandlerFunc
+	for _, group := range engine.groups{
+		if strings.HasPrefix(req.URL.Path, group.prefix){
+			middlewares = append(middlewares, group.middlewares...)
+		}
+	}
+
 	c := newContext(w,req)	//新上下文
+	c.handlers = middlewares
 	engine.router.handle(c)
+}
+
+func (group *RouterGroup) Use(middlewares ...HandlerFunc){
+	group.middlewares = append(group.middlewares, middlewares...)
 }

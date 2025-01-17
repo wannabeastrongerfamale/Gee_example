@@ -9,11 +9,17 @@ import (
 func main(){
 	//创建gee实例
 	r := gee.New()
-	//使用GET、POST添加路由
+	
+	logFileDirectory := "./Log/"
+	r.Use(gee.Logger(logFileDirectory, "httphandle.log"))	//注册全局中间件
+
+
+	//全局路由
 	r.GET("/index", func(c *gee.Context) {
 		c.HTML(http.StatusOK, "<h1>Index Page</h1>\n")
 	})
 
+	//分组路由
 	v1 := r.Group("/v1")
 	{
 		v1.GET("/", func(c *gee.Context) {
@@ -25,7 +31,6 @@ func main(){
 			c.String(http.StatusOK, "hello %s, you're at %s\n", c.Query("name"), c.Path)
 		})
 	}
-
 	v2 := r.Group("/v2")
 	{
 		v2.GET("/hello/:name", func(c *gee.Context) {
@@ -39,7 +44,7 @@ func main(){
 			})
 		})
 	}
-	
+
 	//使用Run启动Web服务
 	r.Run(":9999")
 }

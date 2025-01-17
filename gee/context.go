@@ -18,6 +18,9 @@ type Context struct{
 	Params map[string]string
 	// respone info
 	StatusCode int
+	// middlewares info
+	handlers []HandlerFunc
+	index int
 }
 
 func newContext(w http.ResponseWriter, req *http.Request) *Context{
@@ -26,6 +29,7 @@ func newContext(w http.ResponseWriter, req *http.Request) *Context{
 		Req: req,
 		Path: req.URL.Path,
 		Method: req.Method,
+		index: -1,
 	}
 }
 
@@ -78,4 +82,17 @@ func (c *Context) HTML(code int, html string){
 	c.Status(code)
 	c.SetHeader("Content-Type", "text/html")
 	c.Writer.Write([]byte(html))
+}
+
+func (c *Context) Next(){
+	/*
+	// 1、简单递归--仅适用与所有中间件中都有next()
+	c.index++
+	c.handlers[index](c)
+	*/
+	//2、高适配模式--适配中间件含或不含next()
+	c.index++
+	for ; c.index < len(c.handlers); c.index++{
+		c.handlers[c.index](c)
+	}
 }

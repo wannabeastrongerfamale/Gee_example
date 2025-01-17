@@ -3,6 +3,7 @@ package gee
 import(
 	"fmt"
 	"strings"
+	"net/http"
 )
 
 type Router struct{
@@ -81,10 +82,14 @@ func (r *Router) handle(c *Context){
 	if node != nil{
 		key := c.Method + "-" + node.pattern
 		handler := r.handlers[key]
-		//fmt.Printf("%q\n", node.pattern)
+		fmt.Printf("%q\n", node.pattern)
 		c.Params = params
-		handler(c)
+		c.handlers = append(c.handlers, handler)
 	} else {
-		fmt.Fprintf(c.Writer, "404 NOT FOUND: %s\n", c.Req.URL)
+		c.handlers = append(c.handlers, func(c *Context) {
+			c.String(http.StatusNotFound, "404 NOT FOUND: %s\n", c.Path)
+		})
 	}
+	// 开始执行
+	c.Next()
 }
