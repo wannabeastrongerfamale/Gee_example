@@ -15,21 +15,26 @@ type Context struct{
 	// request info
 	Path string
 	Method string
+	// 动态路由参数
 	Params map[string]string
 	// respone info
 	StatusCode int
 	// middlewares info
 	handlers []HandlerFunc
 	index int
+	
+	engine *Engine
 }
 
-func newContext(w http.ResponseWriter, req *http.Request) *Context{
+func newContext(w http.ResponseWriter, req *http.Request, middlewares []HandlerFunc, engine *Engine) *Context{
 	return &Context{
 		Writer: w,
 		Req: req,
 		Path: req.URL.Path,
 		Method: req.Method,
+		handlers: middlewares,
 		index: -1,
+		engine: engine,
 	}
 }
 
@@ -78,10 +83,18 @@ func (c *Context) Data(code int, data []byte) {
 	c.Writer.Write(data)
 }
 
-func (c *Context) HTML(code int, html string){
+func (c *Context) HTML(code int, name string, data interface{}){
 	c.Status(code)
 	c.SetHeader("Content-Type", "text/html")
-	c.Writer.Write([]byte(html))
+	//执行特定模板，并写回c.Writer
+	if err := c.engine.htmlTemplates.ExecuteTemplate(c.Writer, name, data); err != nil{
+		c.Fail(500, err.Error())
+	}
+}
+
+func (c *Context) Fail(code int, data string){
+	c.Status(code)
+	c.Writer.Write([]byte(data))
 }
 
 func (c *Context) Next(){
@@ -93,6 +106,6 @@ func (c *Context) Next(){
 	//2、高适配模式--适配中间件含或不含next()
 	c.index++
 	for ; c.index < len(c.handlers); c.index++{
-		c.handlers[c.index](c)
+		c.handlers[c.index](c)	//handle
 	}
 }

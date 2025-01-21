@@ -3,6 +3,8 @@ package gee
 import(
 	"net/http"
 	"strings"
+	"html/template"
+	"path"
 )
 
 type HandlerFunc func(c *Context)
@@ -11,6 +13,8 @@ type Engine struct{
 	*RouterGroup	//根RouterGroup
 	router 	*Router	//路由
 	groups []*RouterGroup	//分组列表
+	htmlTemplates *template.Template // for html render
+	funcMap template.FuncMap
 }
 
 type RouterGroup struct{
@@ -53,8 +57,45 @@ func (group *RouterGroup) POST(pattern string, handler HandlerFunc){
 	group.addRoute("POST", pattern, handler)
 }
 
-func (engine *Engine) Run(addr string) (err error) {
-	return http.ListenAndServe(addr,engine)
+// 创建static handler
+func (group *RouterGroup) createStaticHandler(relativePath string, fs http.FileSystem) HandlerFunc {
+	absolutePath := path.Join(group.prefix, relativePath)
+	//创建HTTP文件处理器，包装器StripPrefix从请求的URL中删除给定前缀，并在fs目录下寻找文件
+	fileServer := http.StripPrefix(absolutePath, http.FileServer(fs))
+	return func(c *Context) {
+		file := c.Param("filepath")
+		// Check if file exists and/or if we have permission to access it
+		if _, err := fs.Open(file); err != nil {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		
+		fileServer.ServeHTTP(c.Writer, c.Req)
+	}
+}
+
+//添加静态文件路由
+func (group *RouterGroup) Static(relativePath string, root string){
+	handler := group.createStaticHandler(relativePath, http.Dir(root))
+	urlPattern := path.Join(relativePath, "/*filepath")
+	//fmt.Printf("%q", urlPattern)
+
+	group.GET(urlPattern, handler)
+}
+
+//自定义模板渲染函数
+func (engine *Engine) SetFuncMap(funcMap template.FuncMap){
+	engine.funcMap = funcMap
+}
+
+//解析路径下的所有文件并与模板类关联
+func (engine *Engine) LoadHTMLGlob(pattern string){
+	engine.htmlTemplates = template.Must(template.New("").Funcs(engine.funcMap).ParseGlob(pattern))
+}
+
+//添加中间件
+func (group *RouterGroup) Use(middlewares ...HandlerFunc){
+	group.middlewares = append(group.middlewares, middlewares...)
 }
 
 // 处理HTTP请求入口
@@ -67,11 +108,12 @@ func (engine *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request){
 		}
 	}
 
-	c := newContext(w,req)	//新上下文
-	c.handlers = middlewares
+	// 实例化新上下文
+	c := newContext(w, req, middlewares, engine)
 	engine.router.handle(c)
 }
 
-func (group *RouterGroup) Use(middlewares ...HandlerFunc){
-	group.middlewares = append(group.middlewares, middlewares...)
+//启动服务器
+func (engine *Engine) Run(addr string) (err error) {
+	return http.ListenAndServe(addr,engine)
 }

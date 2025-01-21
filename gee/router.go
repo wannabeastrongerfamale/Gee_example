@@ -82,7 +82,7 @@ func (r *Router) handle(c *Context){
 	if node != nil{
 		key := c.Method + "-" + node.pattern
 		handler := r.handlers[key]
-		fmt.Printf("%q\n", node.pattern)
+		fmt.Printf("%q\n", node.pattern)	//输出当前HTTP请求路由
 		c.Params = params
 		c.handlers = append(c.handlers, handler)
 	} else {
@@ -90,6 +90,7 @@ func (r *Router) handle(c *Context){
 			c.String(http.StatusNotFound, "404 NOT FOUND: %s\n", c.Path)
 		})
 	}
-	// 开始执行
+	
+	// 开始handle下一个处理函数
 	c.Next()
 }

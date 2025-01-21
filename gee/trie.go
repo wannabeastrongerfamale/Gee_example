@@ -2,13 +2,14 @@ package gee
 
 import(
 	"strings"
+	//"fmt"
 )
 
 type node struct{
 	pattern string //待匹配路由
 	part string	//当前结点值
 	children []*node //孩子结点
-	isWild bool	//是否精确匹配
+	isWild bool	//是否模糊匹配
 }
 
 func (n *node) matchChild(part string) *node {
@@ -23,7 +24,8 @@ func (n *node) matchChild(part string) *node {
 func (n *node) matchChildren(part string) []*node {
 	var children []*node
 	for _, child := range n.children {
-		if (child.part == part && n.isWild) || !n.isWild{
+		//fmt.Printf("%q,%q\n", child.part, child.iswild)
+		if (child.part == part && !child.isWild) || child.isWild {
 			children = append(children, child)
 		}
 	}
@@ -47,7 +49,7 @@ func (n *node) insert(pattern string, parts []string, height int){
 
 func (n *node) search(parts []string, height int) *node {
 	if len(parts) == height || strings.HasPrefix(n.part, "*"){
-		if n.pattern == ""{
+		if n.pattern == "" {
 			return nil
 		}
 		return n
@@ -55,6 +57,7 @@ func (n *node) search(parts []string, height int) *node {
 	part := parts[height]
 	children := n.matchChildren(part)
 	for _, child := range children {
+		//fmt.Printf("%q", child.pattern)
 		result := child.search(parts, height+1)
 		if result != nil {
 			return result
